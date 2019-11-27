@@ -1,0 +1,17 @@
+---
+hostinterface: 0.0.0.0
+netport: 3030
+httpport: 9090
+idletimeout: 1
+logginglevel: debug 
+# logging level can be set to any of the following:
+# panic
+# fatal
+# error
+# warning
+# info
+# debug
+# trace
+# 
+# and represents the minimum level at which it will log messages.
+# the default is info
