@@ -1,6 +1,6 @@
 [![codecov](https://codecov.io/gh/nicgrobler/sql3net/branch/master/graph/badge.svg?token=MI697Wb3tt)](https://codecov.io/gh/nicgrobler/sql3net)
 [![License](https://img.shields.io/cocoapods/l/ImageCoordinateSpace.svg?style=flat)](http://cocoapods.org/pods/ImageCoordinateSpace)
-
+[![Actions Status](https://github.com/nicgrobler/sql3net/workflows/Test/badge.svg)](https://github.com/nicgrobler/sql3net/actions)
 # SQL3net
 
 A basic wrapper around the excellent SQLite3 library that includes a network server which allows us SQLite to be used as if it is running on the local machine. This can be very useful when deployed into its own container, which will, by default, allow all other containers within the same network to share a fully SQL compliant DB without any additional configuration. The server handles locking to enable SQLite to handle multiple concurrent access - many readers do not block each other, only writes will lock the db. This effectively adds a basic form of concurrency to SQLite, which doesn't support this.  
