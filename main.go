@@ -114,6 +114,10 @@ func pathIsValid(path string) bool {
 	if strings.TrimSpace(path) == "" {
 		return false
 	}
+	if strings.Contains(path, " ") {
+		// not windows, no whitespace in filenames
+		return false
+	}
 	// we have a dsn that MIGHT be valid, so need to parse it - if it fails here, it is likely to be invalid
 	_, err := neturl.Parse(path)
 	if err != nil {

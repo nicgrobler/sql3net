@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"os"
 	"sync"
 	"testing"
 
@@ -9,6 +10,47 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 )
+
+func clearEnv() {
+	os.Setenv("HOST_INTERFACE", "")
+	os.Setenv("NET_PORT", "")
+	os.Setenv("HTTP_PORT", "")
+	os.Setenv("IDLE_TIMEOUT", "")
+	os.Setenv("LOG_LEVEL", "")
+
+}
+
+func TestGetConfig(t *testing.T) {
+	// clear env settings
+	clearEnv()
+	c := getConfig()
+	// confirm defaults get set
+	assert.Equal(t, "0.0.0.0", c.HostInterface)
+	assert.Equal(t, PORT, c.NetPort)
+	assert.Equal(t, HTTP_PORT, c.HTTPPort)
+	assert.Equal(t, CONNECTION_CLOSE_TIME_LIMIT, c.IdleTimeout)
+	assert.Equal(t, "info", c.LoggingLevel)
+
+	// now confirm that overrides work
+	os.Setenv("HOST_INTERFACE", "1.2.3.4")
+	os.Setenv("NET_PORT", "1234")
+
+	c = getConfig()
+	assert.Equal(t, "1.2.3.4", c.HostInterface)
+	assert.Equal(t, "1234", c.NetPort)
+	assert.Equal(t, HTTP_PORT, c.HTTPPort)
+	assert.Equal(t, CONNECTION_CLOSE_TIME_LIMIT, c.IdleTimeout)
+	assert.Equal(t, "info", c.LoggingLevel)
+
+}
+
+func TestPathValid(t *testing.T) {
+	assert.False(t, pathIsValid(""))
+	assert.False(t, pathIsValid("  "))
+	assert.False(t, pathIsValid("_ d_"))
+	assert.True(t, pathIsValid("0.0.0.0"))
+	assert.False(t, pathIsValid(":"))
+}
 
 func TestQ3FileInit(t *testing.T) {
 	// invalid
