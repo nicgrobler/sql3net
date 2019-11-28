@@ -14,9 +14,11 @@ TCP  -> port 3030
 *This code works by running the docker-compose file, or, by simply building it on your host, and invoking it directly (but this will require that you have the sqlite3 libs on your host)*  
 
 ### Run
+The tool uses environment variables which are supplied from the *config.env* file (and the docker-compose file if running as container).
 simply call the code like this:
 ```
-$ sql3net -config config.yml
+$ source ./config.env
+$ sql3net
 ```
 or, using docker-compose:
 ```

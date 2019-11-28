@@ -5,18 +5,17 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"flag"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
-
-	"gopkg.in/yaml.v2"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/sirupsen/logrus"
@@ -34,11 +33,11 @@ const (
 )
 
 type Config struct {
-	HostInterface string        `yaml:",omitempty"`
-	NetPort       string        `yaml:",omitempty"`
-	HTTPPort      string        `yaml:",omitempty"`
-	IdleTimeout   time.Duration `yaml:",omitempty"`
-	LoggingLevel  string        `yaml:",omitempty"`
+	HostInterface string
+	NetPort       string
+	HTTPPort      string
+	IdleTimeout   time.Duration
+	LoggingLevel  string
 }
 
 type fileStore struct {
@@ -47,22 +46,50 @@ type fileStore struct {
 }
 
 type q3file struct {
-	path string
-	db   *sql.DB
-	lock *sync.RWMutex
+	path  string
+	db    *sql.DB
+	lock  *sync.RWMutex
+	valid bool
 }
 
 func getConfig() *Config {
 	c := &Config{}
-	c.HostInterface = "0.0.0.0" //getLocalAddress()
+	c.HostInterface = "0.0.0.0"
 	c.NetPort = PORT
 	c.HTTPPort = HTTP_PORT
 	c.IdleTimeout = CONNECTION_CLOSE_TIME_LIMIT
 	c.LoggingLevel = "info"
+	c.updateConfig()
+
 	return c
 }
 
-func (f *fileStore) getFile(fileName string) *q3file {
+func (c *Config) updateConfig() {
+	if s := os.Getenv("HOST_INTERFACE"); s != "" {
+		c.HostInterface = s
+	}
+	if s := os.Getenv("NET_PORT"); s != "" {
+		c.NetPort = s
+	}
+	if s := os.Getenv("HTTP_PORT"); s != "" {
+		c.HTTPPort = s
+	}
+	if s := os.Getenv("IDLE_TIMEOUT"); s != "" {
+		i, err := strconv.Atoi(s)
+		if err == nil {
+			c.IdleTimeout = time.Duration(i) * time.Second
+		}
+	}
+	if s := os.Getenv("LOG_LEVEL"); s != "" {
+		c.LoggingLevel = s
+	}
+}
+
+func (f *fileStore) getFile(fileName string) (*q3file, error) {
+	// verify that this path is valid
+	if !pathIsValid(fileName) {
+		return nil, errors.New("invalid filename supplied")
+	}
 	// if file not already in store, create it, then return it
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -75,11 +102,24 @@ func (f *fileStore) getFile(fileName string) *q3file {
 		f.store[fileName] = newFile
 		file = newFile
 	}
-	return file
+	return file, nil
 }
 
 func (f *q3file) getPath() string {
 	return f.path
+}
+
+func pathIsValid(path string) bool {
+	// validate the supplied path
+	if strings.TrimSpace(path) == "" {
+		return false
+	}
+	// we have a dsn that MIGHT be valid, so need to parse it - if it fails here, it is likely to be invalid
+	_, err := neturl.Parse(path)
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 func (f *q3file) init() {
@@ -88,6 +128,7 @@ func (f *q3file) init() {
 		log.Fatal(err)
 	}
 	f.db = srcDb
+	f.valid = true
 }
 
 func (f *q3file) close() {
@@ -199,7 +240,11 @@ func (f *fileStore) netHandler(connection *QConn) {
 		writeError(connection.Conn, errors.New("empty string"))
 		return
 	}
-	q3f := f.getFile(connection.GetDBName())
+	q3f, err := f.getFile(connection.GetDBName())
+	if err != nil {
+		writeError(connection.Conn, err)
+		return
+	}
 	// route depending on Query or Exec
 	s := strings.Split(strings.ToLower(string(buf.Bytes())), " ")
 	if s[0] == "select" {
@@ -234,7 +279,11 @@ func (f *fileStore) httpReadHandler(w http.ResponseWriter, r *http.Request) {
 		writeHTTPError(w, errors.New("empty string"))
 		return
 	}
-	q3f := f.getFile(getHTTPDBName(r))
+	q3f, err := f.getFile(getHTTPDBName(r))
+	if err != nil {
+		writeHTTPError(w, err)
+		return
+	}
 	rows, err := q3f.query(string(b))
 	if err != nil {
 		writeHTTPError(w, err)
@@ -259,7 +308,11 @@ func (f *fileStore) httpWriteHandler(w http.ResponseWriter, r *http.Request) {
 		writeHTTPError(w, errors.New("empty string"))
 		return
 	}
-	q3f := f.getFile(getHTTPDBName(r))
+	q3f, err := f.getFile(getHTTPDBName(r))
+	if err != nil {
+		writeHTTPError(w, err)
+		return
+	}
 	_, err = q3f.exec(string(b))
 	if err != nil {
 		writeHTTPError(w, err)
@@ -274,7 +327,7 @@ func getHTTPDBName(r *http.Request) string {
 		bits := strings.Split(address, ":")
 		return bits[0] + ".db"
 	}
-	return "mysterious.db"
+	return ""
 }
 
 func getLocalAddress() string {
@@ -325,18 +378,7 @@ func main() {
 	// Only log the warning severity or above.
 	log.SetLevel(log.InfoLevel)
 
-	config := flag.String("config", "config.yml", "name of the configuration file to use")
-
-	flag.Parse()
-	file, err := ioutil.ReadFile(*config)
-	if err != nil {
-		log.Fatal(err)
-	}
-	// get default config object, then unmarshall into it (this essentially overrides the values with those from the file)
 	c := getConfig()
-	if err := yaml.Unmarshal(file, c); err != nil {
-		log.Fatal(err)
-	}
 
 	// set logging
 	level := c.LoggingLevel

@@ -223,5 +223,5 @@ func (c *QConn) GetDBName() string {
 	if addr, ok := c.Conn.RemoteAddr().(*net.TCPAddr); ok {
 		return addr.IP.String() + ".db"
 	}
-	return "mysterious.db"
+	return c.Conn.RemoteAddr().String() + ".db"
 }

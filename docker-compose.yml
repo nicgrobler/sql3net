@@ -5,6 +5,12 @@ services:
     build:
       context: ./
       dockerfile: Dockerfile
+    environment:
+      - HOST_INTERFACE=0.0.0.0
+      - NET_PORT=3030
+      - HTTP_PORT=9090
+      - IDLE_TIMEOUT=1
+      - LOG_LEVEL=debug 
     ports:
       - "3030:3030"
       - "9090:9090"

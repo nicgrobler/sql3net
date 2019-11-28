@@ -10,6 +10,27 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 )
 
+func TestQ3FileInit(t *testing.T) {
+	// invalid
+	fs := &fileStore{lock: &sync.Mutex{}}
+	fs.store = make(map[string]*q3file)
+	fs.store["0.0.0.0.db"] = &q3file{
+		path: "/fakefile",
+		lock: &sync.RWMutex{},
+	}
+
+	// valid path
+	f, err := fs.getFile("0.0.0.0.db")
+	assert.NotNil(t, f, "should not be nil")
+	assert.Nil(t, err, "should be nil")
+
+	// invalid path
+	f, err = fs.getFile("")
+	assert.Nil(t, f, "should be nil")
+	assert.Equal(t, "invalid filename supplied", err.Error())
+
+}
+
 func TestNetHandlerQuery(t *testing.T) {
 	fakeDB, mock, err := sqlmock.New()
 	assert.NoError(t, err)
@@ -27,7 +48,7 @@ func TestNetHandlerQuery(t *testing.T) {
 
 	fs := &fileStore{lock: &sync.Mutex{}}
 	fs.store = make(map[string]*q3file)
-	fs.store["mysterious.db"] = &q3file{
+	fs.store["5.6.7.8.db"] = &q3file{
 		path: "/fakefile",
 		db:   fakeDB,
 		lock: &sync.RWMutex{},
@@ -61,7 +82,7 @@ func TestNetHandlerExec(t *testing.T) {
 
 	fs := &fileStore{lock: &sync.Mutex{}}
 	fs.store = make(map[string]*q3file)
-	fs.store["mysterious.db"] = &q3file{
+	fs.store["5.6.7.8.db"] = &q3file{
 		path: "/fakefile",
 		db:   fakeDB,
 		lock: &sync.RWMutex{},
@@ -93,7 +114,7 @@ func TestNetHandlerErrors(t *testing.T) {
 
 	fs := &fileStore{lock: &sync.Mutex{}}
 	fs.store = make(map[string]*q3file)
-	fs.store["mysterious.db"] = &q3file{
+	fs.store["5.6.7.8.db"] = &q3file{
 		path: "/fakefile",
 		lock: &sync.RWMutex{},
 	}
@@ -124,7 +145,7 @@ func TestHTTPHandlerQuery(t *testing.T) {
 
 	fs := &fileStore{lock: &sync.Mutex{}}
 	fs.store = make(map[string]*q3file)
-	fs.store["mysterious.db"] = &q3file{
+	fs.store["5.6.7.8.db"] = &q3file{
 		path: "/fakefile",
 		db:   fakeDB,
 		lock: &sync.RWMutex{},
@@ -133,7 +154,7 @@ func TestHTTPHandlerQuery(t *testing.T) {
 	// create mocked db return
 	mock.ExpectQuery("select \\* from apples").WillReturnRows(sqlmock.NewRows([]string{"id", "age"}).AddRow("1", "899"))
 
-	fakeRequest := &http.Request{Body: c.Conn}
+	fakeRequest := &http.Request{Body: c.Conn, RemoteAddr: c.Conn.RemoteAddr().String()}
 
 	fs.httpReadHandler(fakeWriter{}, fakeRequest)
 
@@ -160,7 +181,7 @@ func TestHTTPHandlerExec(t *testing.T) {
 
 	fs := &fileStore{lock: &sync.Mutex{}}
 	fs.store = make(map[string]*q3file)
-	fs.store["mysterious.db"] = &q3file{
+	fs.store["5.6.7.8.db"] = &q3file{
 		path: "/fakefile",
 		db:   fakeDB,
 		lock: &sync.RWMutex{},
@@ -169,7 +190,7 @@ func TestHTTPHandlerExec(t *testing.T) {
 	// create mocked db return
 	mock.ExpectExec("insert into apples\\(id\\) value\\(1\\)").WillReturnResult(sqlmock.NewResult(0, 0))
 
-	fakeRequest := &http.Request{Body: c.Conn}
+	fakeRequest := &http.Request{Body: c.Conn, RemoteAddr: c.Conn.RemoteAddr().String()}
 
 	fs.httpWriteHandler(fakeWriter{}, fakeRequest)
 
