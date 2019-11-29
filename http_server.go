@@ -24,9 +24,12 @@ type HttpServer struct {
 // NewHTTPServer takes a valid address - can be of form IP:Port, or :Port - and returns a server
 func NewHTTPServer(description, address string) *HttpServer {
 	s := &HttpServer{slug: description, address: address, Done: make(chan error), router: http.NewServeMux()}
-	s.listener = &http.Server{Addr: address, Handler: s.router, IdleTimeout: time.Duration(IDLE_CONNECTION_TIMEOUT)}
-
+	s.setListener(&http.Server{Addr: address, Handler: s.router, IdleTimeout: time.Duration(IDLE_CONNECTION_TIMEOUT)})
 	return s
+}
+
+func (s *HttpServer) setListener(l *http.Server) {
+	s.listener = l
 }
 
 // RegisterHandler allows caller to set routing and handler functions as needed
@@ -39,9 +42,9 @@ func (s *HttpServer) RegisterHandler(path string, handlerfn func(http.ResponseWr
 // closes any remaining conections. Once done close Done channel
 // note: this is a blocking call
 func (s *HttpServer) StartListener(ctx context.Context, timeout time.Duration) {
-	var err error
+
 	go func() {
-		if err = s.listener.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := s.listener.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("http listen:%+s", err)
 		}
 	}()
@@ -57,8 +60,13 @@ func (s *HttpServer) StartListener(ctx context.Context, timeout time.Duration) {
 		cancel()
 	}()
 
-	if err = s.listener.Shutdown(ctxShutDown); err != nil {
-		log.Fatalf(s.slug+" graceful shutdown failed:%+s", err)
+	if err := s.listener.Shutdown(ctxShutDown); err != nil {
+		log.Warnf(s.slug+" graceful shutdown failed:%+s", err)
+		if e := s.listener.Close(); e != nil {
+			log.Fatalf(s.slug+" forced shutdown failed:%+s", err)
+		} else {
+			log.Info("forced shutdown ok")
+		}
 	}
 
 	log.Info(s.slug + " stopped")

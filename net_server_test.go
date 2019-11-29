@@ -71,12 +71,12 @@ func TestClose(t *testing.T) {
 	pool := getEmptyPool()
 	pool.addToPool(c)
 	// pool should have a single connection in it...
-	assert.Equal(t, 1, len(pool.connections), "The pool should contain 1 connection")
+	assert.Equal(t, 1, pool.getSize(), "The pool should contain 1 connection")
 	// verify that the connection cleans-up after itself by closing the connection and removing itself from the pool when Close() is called
 	for tc := range pool.connections {
 		tc.Close()
 	}
-	assert.Equal(t, 0, len(pool.connections), "The pool should contain no connections")
+	assert.Equal(t, 0, pool.getSize(), "The pool should contain no connections")
 }
 
 func getEmptyPool() connPool {
@@ -97,7 +97,7 @@ func TestAddToPool(t *testing.T) {
 	pool := getEmptyPool()
 	pool.addToPool(c)
 	// pool should have a single connection in it...
-	assert.Equal(t, 1, len(pool.connections), "The pool should contain 1 connection")
+	assert.Equal(t, 1, pool.getSize(), "The pool should contain 1 connection")
 	// verify that the connection is the SAME one we added
 	for tc := range pool.connections {
 		assert.Equal(t, c, tc, "The connection objects should be the same")
@@ -106,11 +106,11 @@ func TestAddToPool(t *testing.T) {
 
 func TestDeleteFromPool(t *testing.T) {
 	pool := getLoadedPool(2)
-	assert.Equal(t, 2, len(pool.connections), "The pool should contain 2 connections")
+	assert.Equal(t, 2, pool.getSize(), "The pool should contain 2 connections")
 	for c := range pool.connections {
 		pool.deleteFromPool(c)
 	}
-	assert.Equal(t, 0, len(pool.connections), "The pool should contain no connections")
+	assert.Equal(t, 0, pool.getSize(), "The pool should contain no connections")
 }
 
 func TestStartListener(t *testing.T) {
@@ -125,8 +125,8 @@ func TestStartListener(t *testing.T) {
 	netServer.RegisterHandler(func(conn *QConn) { result <- conn.Conn.RemoteAddr().String() })
 
 	// run net server's listener
-	go netServer.StartListener(ctx, time.Duration(1*time.Second))
-
+	go netServer.StartListener(ctx, time.Duration(1*time.Millisecond))
+	netServer.connPool.forceClose()
 	assert.Equal(t, false, netServer.t.isShutdown(), "These should be equal")
 	assert.Equal(t, "5.6.7.8", <-result, "These should be equal")
 
@@ -136,6 +136,7 @@ func TestStartListenerDuringShutdown(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
 	// grab ctx to pass onto server(s)
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	result := make(chan string, 1)
 
 	// initialise net listener
@@ -144,26 +145,29 @@ func TestStartListenerDuringShutdown(t *testing.T) {
 
 	assert.Equal(t, false, netServer.t.isShutdown(), "These should be equal")
 
-	var closed bool
-	go func(c *bool) {
+	closed := &Tracker{}
+	go func(c *Tracker) {
 		<-netServer.Done
-		*c = true
-	}(&closed)
+		c.setShutdown()
+	}(closed)
 
 	// run net server's listener
-	go netServer.StartListener(ctx, time.Duration(5*time.Millisecond))
+	go netServer.StartListener(ctx, time.Duration(50*time.Millisecond))
 	// give it some time to actually run
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(5 * time.Millisecond)
+	// verify that it is open
+	assert.Equal(t, false, closed.isShutdown(), "should be the same if channel open")
 	// now signal it
 	cancel()
-	// give it some time to actually run
-	time.Sleep(100 * time.Millisecond)
+	// give it some time to actually run - will be at least "2 x timeout" for graceful shutdown
+	time.Sleep(150 * time.Millisecond)
 	// verify that the listener accepted the connection
 	assert.Equal(t, "5.6.7.8", <-result, "These should be equal")
 
 	// verify that the flag has been set to indicate shutdown state
 	assert.Equal(t, true, netServer.t.isShutdown(), "These should be equal")
-	assert.Equal(t, true, closed, "should be the same if channel closed")
+	//assert.Equal(t, true, closed.isShutdown(), "should be the same if channel closed")
+	netServer.connPool.forceClose()
 }
 
 /*

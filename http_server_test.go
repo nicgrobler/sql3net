@@ -1,47 +1,60 @@
 package main
 
 import (
-	"context"
+	"bytes"
 	"net/http"
+	"sync"
 	"testing"
-	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestStartHTTPListener(t *testing.T) {
-	log.SetLevel(log.WarnLevel)
-	// grab ctx to pass onto server(s)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	b := false
-	acceptedConnection := &b
+func TestHTTPRouting(t *testing.T) {
+	// create our fake data store
+	fakeDB, mock, err := sqlmock.New()
+	assert.NoError(t, err)
+	// create mocked db return
+	mock.ExpectQuery("select \\* from apples").WillReturnRows(sqlmock.NewRows([]string{"id", "age"}).AddRow("1", "899"))
 
-	// initialise net listener
-	httpServer := NewHTTPServer("http listener", "127.0.0.1:1234")
-	httpServer.RegisterHandler("/nonesenseDoNothingHandler", func(http.ResponseWriter, *http.Request) { *acceptedConnection = true })
-	go httpServer.StartListener(ctx, time.Duration(50*time.Millisecond))
-	// handler not called yet
-	assert.Equal(t, false, *acceptedConnection, "These should be equal")
-	var closed bool
-	go func(c *bool) {
-		<-httpServer.Done
-		*c = true
-	}(&closed)
+	fs := &fileStore{lock: &sync.Mutex{}}
+	fs.store = make(map[string]*q3file)
+	fs.store["1.2.3.4.db"] = &q3file{
+		path: "/fakefile",
+		db:   fakeDB,
+		lock: &sync.RWMutex{},
+	}
 
-	// call, and confirm that handler fired
-	http.Get("http://127.0.0.1:1234/nonesenseDoNothingHandler")
-	// give it some time to actually run
-	time.Sleep(100 * time.Millisecond)
-	assert.Equal(t, true, *acceptedConnection, "These should be equal")
-	// check that server still listening
-	assert.Equal(t, false, closed, "should be equal")
-	// kill server
-	cancel()
-	// give it some time to actually run
-	time.Sleep(100 * time.Millisecond)
-	// check that server shutdown
-	assert.Equal(t, true, closed, "should be equal")
+	// as the handlers are tested elsewhere, here we are testing the routing of the incoming connections
+	// to ensure that the correct handlers are always called
+	// initialise http listener
+	httpServer := NewHTTPServer("http listener", "localhost")
+	httpServer.RegisterHandler("/read", fs.httpReadHandler)
+	httpServer.RegisterHandler("/write", fs.httpWriteHandler)
 
+	// as we are not testing the network, and want to be able reproduce this without relying on OS to supply ports for each test (and tearing them down afterwards)
+	// we invoke the MUX as would happen on connect
+	body := bytes.NewBuffer([]byte("select * from apples"))
+	r, err := http.NewRequest("POST", "http://localhost/read", body)
+	r.RemoteAddr = "1.2.3.4:80"
+	assert.Nil(t, err, "should be nil")
+
+	f := fakeHttpWriter{b: &bytes.Buffer{}}
+	httpServer.router.ServeHTTP(f, r)
+
+	// if routing worked as it should, this should be going to QUERY
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+
+}
+
+type fakeHttpWriter struct {
+	b *bytes.Buffer
+}
+
+func (f fakeHttpWriter) Header() http.Header { return http.Header{} }
+func (f fakeHttpWriter) WriteHeader(int)     { return }
+func (f fakeHttpWriter) Write(d []byte) (int, error) {
+	return f.b.Write(d)
 }

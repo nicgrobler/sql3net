@@ -88,7 +88,7 @@ func (c *Config) updateConfig() {
 func (f *fileStore) getFile(fileName string) (*q3file, error) {
 	// verify that this path is valid
 	if !pathIsValid(fileName) {
-		return nil, errors.New("invalid filename supplied")
+		return nil, errors.New("invalid filename supplied: '" + fileName + "'")
 	}
 	// if file not already in store, create it, then return it
 	f.lock.Lock()
@@ -200,6 +200,7 @@ func (f *q3file) rowsHTTPPrinter(w http.ResponseWriter, rows *sql.Rows) {
 	if err != nil {
 		writeHTTPError(w, err)
 	}
+	defer rows.Close()
 
 	values := make([]sql.RawBytes, len(columns))
 	scanArgs := make([]interface{}, len(values))
@@ -269,6 +270,7 @@ func (f *fileStore) netHandler(connection *QConn) {
 }
 
 func (f *fileStore) httpReadHandler(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
 	log.Debugf("accepted connection from: %v", r.RemoteAddr)
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -298,6 +300,7 @@ func (f *fileStore) httpReadHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (f *fileStore) httpWriteHandler(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
 	log.Debugf("accepted connection from: %v", r.RemoteAddr)
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {

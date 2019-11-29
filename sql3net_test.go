@@ -69,7 +69,7 @@ func TestQ3FileInit(t *testing.T) {
 	// invalid path
 	f, err = fs.getFile("")
 	assert.Nil(t, f, "should be nil")
-	assert.Equal(t, "invalid filename supplied", err.Error())
+	assert.Equal(t, "invalid filename supplied: ''", err.Error())
 
 }
 

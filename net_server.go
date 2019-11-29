@@ -75,12 +75,29 @@ func (s *connPool) deleteFromPool(connection *QConn) {
 	s.locker.Unlock()
 }
 
+func (s *connPool) getSize() int {
+	i := 0
+	s.locker.Lock()
+	i = len(s.connections)
+	s.locker.Unlock()
+	return i
+}
+
+func (s *connPool) forceClose() {
+	// must only be called at the end, once Close has failed - and map will never be used again
+	s.locker.Lock()
+	for conn := range s.connections {
+		conn.Conn.Close()
+	}
+	s.locker.Unlock()
+}
+
 func (s *NetServer) checkPoolSize(done chan struct{}) {
 	// tick every 100ms
-	t := time.NewTicker(time.Duration(100000) * time.Nanosecond)
+	t := time.NewTicker(time.Duration(1) * time.Millisecond)
 	for {
 		<-t.C
-		if len(s.connections) == 0 {
+		if s.connPool.getSize() == 0 {
 			done <- struct{}{}
 			return
 		}
@@ -99,10 +116,11 @@ func (s *NetServer) stopListener(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Warnf("pool still contains %v connections, force closing", len(s.connections))
+			log.Warnf("pool still contains %v connections, force closing", s.connPool.getSize())
+			s.connPool.forceClose()
 			return ctx.Err()
 		case <-done:
-			log.Debugf("pool contains %v connoections, drained ok", len(s.connections))
+			log.Debugf("pool contains %v connections, drained ok", s.connPool.getSize())
 			return nil
 		}
 	}
@@ -164,7 +182,7 @@ func (s *NetServer) RegisterHandler(handlerfn func(*QConn)) {
 // closes any remaining conections. Once done close Done channel
 // note: this is a blocking call
 func (s *NetServer) StartListener(ctx context.Context, timeout time.Duration) {
-	var err error
+
 	go func() {
 		for {
 			// Listen for an incoming connection.
@@ -192,6 +210,7 @@ func (s *NetServer) StartListener(ctx context.Context, timeout time.Duration) {
 
 		}
 	}()
+	// defer in case
 	defer s.listener.Close()
 
 	log.Infoln(s.slug + " on: " + s.address)
@@ -206,8 +225,8 @@ func (s *NetServer) StartListener(ctx context.Context, timeout time.Duration) {
 	defer func() {
 		cancel()
 	}()
-
-	if err = s.stopListener(ctxShutDown); err != nil {
+	// stop new connections
+	if err := s.stopListener(ctxShutDown); err != nil {
 		log.Warnf(s.slug+" graceful shutdown failed:%+s", err)
 	}
 
