@@ -7,6 +7,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v1
     - name: Test
-      run: go test -coverprofile=coverage.txt -covermode=atomic ./... 
+      run: go test -race -coverprofile=coverage.txt -covermode=atomic ./... 
     - name: Report code coverage
-      run: bash <(curl -s 'https://codecov.io/bash') -t "69039a38-5cbf-4e6f-a2cb-c6d1751471ea"
+      run: bash <(curl -s 'https://codecov.io/bash') -t ${{ secrets.CODECOV_TOKEN }}
