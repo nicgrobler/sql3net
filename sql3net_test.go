@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"net/http"
 	"os"
 	"sync"
@@ -42,6 +44,13 @@ func TestGetConfig(t *testing.T) {
 	assert.Equal(t, CONNECTION_CLOSE_TIME_LIMIT, c.IdleTimeout)
 	assert.Equal(t, "info", c.LoggingLevel)
 
+}
+
+func TestWriteError(t *testing.T) {
+	b := &bytes.Buffer{}
+	expectedError := errors.New("oh dear - this is a BAD error. BAD.")
+	writeError(b, expectedError)
+	assert.Equal(t, expectedError.Error()+"\n", string(b.Bytes()), "these should be exactly the same")
 }
 
 func TestPathValid(t *testing.T) {

@@ -151,14 +151,9 @@ func (f *q3file) query(query string) (*sql.Rows, error) {
 	return f.db.Query(query)
 }
 
-func writeError(conn net.Conn, err error) {
+func writeError(conn io.Writer, err error) {
 	conn.Write([]byte(err.Error()))
 	conn.Write([]byte(LINE_END))
-}
-
-func writeHTTPError(w http.ResponseWriter, err error) {
-	w.Write([]byte(err.Error()))
-	w.Write([]byte(LINE_END))
 }
 
 func (f *q3file) rowsPrinter(conn net.Conn, rows *sql.Rows) {
@@ -198,7 +193,7 @@ func (f *q3file) rowsHTTPPrinter(w http.ResponseWriter, rows *sql.Rows) {
 	// column names
 	columns, err := rows.Columns()
 	if err != nil {
-		writeHTTPError(w, err)
+		writeError(w, err)
 	}
 	defer rows.Close()
 
@@ -211,7 +206,7 @@ func (f *q3file) rowsHTTPPrinter(w http.ResponseWriter, rows *sql.Rows) {
 	for rows.Next() {
 		err = rows.Scan(scanArgs...)
 		if err != nil {
-			writeHTTPError(w, err)
+			writeError(w, err)
 		}
 		// now print the row, column-wise
 		for i := range values {
@@ -223,7 +218,7 @@ func (f *q3file) rowsHTTPPrinter(w http.ResponseWriter, rows *sql.Rows) {
 		w.Write([]byte(LINE_END))
 	}
 	if err = rows.Err(); err != nil {
-		writeHTTPError(w, err)
+		writeError(w, err)
 	}
 
 }
@@ -274,25 +269,25 @@ func (f *fileStore) httpReadHandler(w http.ResponseWriter, r *http.Request) {
 	log.Debugf("accepted connection from: %v", r.RemoteAddr)
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		writeHTTPError(w, err)
+		writeError(w, err)
 		return
 	}
 	if len(b) < 1 {
-		writeHTTPError(w, errors.New("empty string"))
+		writeError(w, errors.New("empty string"))
 		return
 	}
 	if len(strings.TrimSpace(string(b))) == 0 {
-		writeHTTPError(w, errors.New("empty string"))
+		writeError(w, errors.New("empty string"))
 		return
 	}
 	q3f, err := f.getFile(getHTTPDBName(r))
 	if err != nil {
-		writeHTTPError(w, err)
+		writeError(w, err)
 		return
 	}
 	rows, err := q3f.query(string(b))
 	if err != nil {
-		writeHTTPError(w, err)
+		writeError(w, err)
 	} else {
 		q3f.rowsHTTPPrinter(w, rows)
 	}
@@ -304,25 +299,25 @@ func (f *fileStore) httpWriteHandler(w http.ResponseWriter, r *http.Request) {
 	log.Debugf("accepted connection from: %v", r.RemoteAddr)
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		writeHTTPError(w, err)
+		writeError(w, err)
 		return
 	}
 	if len(b) < 1 {
-		writeHTTPError(w, errors.New("empty string"))
+		writeError(w, errors.New("empty string"))
 		return
 	}
 	if len(strings.TrimSpace(string(b))) == 0 {
-		writeHTTPError(w, errors.New("empty string"))
+		writeError(w, errors.New("empty string"))
 		return
 	}
 	q3f, err := f.getFile(getHTTPDBName(r))
 	if err != nil {
-		writeHTTPError(w, err)
+		writeError(w, err)
 		return
 	}
 	_, err = q3f.exec(string(b))
 	if err != nil {
-		writeHTTPError(w, err)
+		writeError(w, err)
 	} else {
 		// TODO - perhaps return rows affected.
 	}
