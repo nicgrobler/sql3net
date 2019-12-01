@@ -46,6 +46,41 @@ func TestGetConfig(t *testing.T) {
 
 }
 
+func TestExctractIdentifier(t *testing.T) {
+	data := []byte("a1b2c3;;select * from bla;")
+	id, queryOffset := exctractIdentifier(data)
+	assert.Equal(t, "a1b2c3", id, "the id should match this string")
+	assert.Equal(t, "select * from bla;", string(data[queryOffset:]), "the query should match this string")
+
+	idTooLong := []byte("a1b2c3-ezrwzureouzqwr-23756gfidgkhvcbk;;select * from bla;")
+	id, queryOffset = exctractIdentifier(idTooLong)
+	assert.Equal(t, "", id, "the id should match this string")
+	assert.Equal(t, "a1b2c3-ezrwzureouzqwr-23756gfidgkhvcbk;;select * from bla;", string(idTooLong[queryOffset:]), "the query should match this string")
+
+	data = []byte(";;select * from bla;")
+	id, queryOffset = exctractIdentifier(data)
+	assert.Equal(t, "", id, "the id should match this string")
+	assert.Equal(t, "select * from bla;", string(data[queryOffset:]), "the query should match this string")
+}
+
+func TestQueryOffset(t *testing.T) {
+	data := []byte("a1b2c3;;select * from bla;")
+	offset, found := queryOffset(data)
+	assert.Equal(t, 8, offset, "the query should start from here")
+	assert.True(t, found, "should be true as found")
+
+	data = []byte(";;select * from bla;")
+	offset, found = queryOffset(data)
+	assert.Equal(t, 2, offset, "the query should start from here")
+	assert.False(t, found, "first characters are ;;, so should be false, as no identifier")
+
+	data = []byte("select * from bla;")
+	offset, found = queryOffset(data)
+	assert.Equal(t, 0, offset, "the query should start from here")
+	assert.False(t, found, ";; not within first 32 chars, so should be false")
+
+}
+
 func TestWriteError(t *testing.T) {
 	b := &bytes.Buffer{}
 	expectedError := errors.New("oh dear - this is a BAD error. BAD.")

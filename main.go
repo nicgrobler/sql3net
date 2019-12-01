@@ -24,6 +24,7 @@ import (
 
 const (
 	DELIM                                     = "|"
+	SEPERATOR_LENGTH                          = 2
 	LINE_END                                  = "\n"
 	PORT                                      = "3030"
 	HTTP_PORT                                 = "9090"
@@ -371,6 +372,51 @@ func signalContext() context.Context {
 
 	return ctx
 
+}
+
+func exctractIdentifier(data []byte) (string, int) {
+	identifier := ""
+	queryStartOffset := 0
+
+	offset, found := queryOffset(data)
+	if offset > 0 && found {
+		identifier = string(data[0 : offset-SEPERATOR_LENGTH])
+		queryStartOffset = offset
+	}
+	if offset > 0 && !found {
+		identifier = ""
+		queryStartOffset = offset
+	}
+	return identifier, queryStartOffset
+}
+
+func queryOffset(data []byte) (int, bool) {
+	/*
+		the incoming data is optionally going to start with a user-defined identifier string, followed by a ';;', and then the query payload.
+		this simple helper returns the position (if any) of the FIRST ';;' found.
+
+		the rule is that we support up to 32 characters at the start of the stream (enough to hold an MD5 hash, for example)
+		so we return 0 if we have not found a ';;' within the first 32 characters, or immediately following them.
+	*/
+	seeking := byte(';')
+	for i := range data {
+		if i == 32 {
+			break
+		}
+		if data[i] == seeking {
+			// if the next char is also the same, we have found the delimiter. if not, we have an issue
+			if i < len(data)-1 {
+				if i == 0 && data[i+1] == seeking {
+					// somehow our stream starts with ';;', so there is actually no identifier
+					return i + SEPERATOR_LENGTH, false
+				}
+				if data[i+1] == seeking {
+					return i + SEPERATOR_LENGTH, true
+				}
+			}
+		}
+	}
+	return 0, false
 }
 
 func main() {
