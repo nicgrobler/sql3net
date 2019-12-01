@@ -81,7 +81,7 @@ $ echo "select * from bubbles" | nc sql3net 3030
 Although the examples use netcat, you can use *any* network client able to send tcp packets to a given address. There is no serialization taking place, just send and receive of raw bytes - these are then forwarded to SQLite exactly as would be the case if you ran your queries against a local SQLite file. There are no additonal controls - you are free to use and abuse the db as you need.
 
 NOTE: by *default* SQL3net creates a db file based on the network address of the *source* of the connection, but this can be overriden at runtime by simply supplying your own identifer - this can be any string of up-to 32 valid characters, followed by ";;", and then the SQL statement. For example:  
-
+```
 $ cat create_insert.txt
 a1b2-c3d4-something-funky;;create table bubble(id int, word text);
 insert into bubble(id, word) values (1,"banana");
