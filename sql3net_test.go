@@ -46,6 +46,24 @@ func TestGetConfig(t *testing.T) {
 
 }
 
+func TestGetIDAndQuery(t *testing.T) {
+	data := []byte("a1b2c3;;select * from bla;")
+	id, query := getIDAndQuery(data)
+	assert.Equal(t, "a1b2c3", id, "should be the same")
+	assert.Equal(t, "select * from bla;", string(query), "should be the same")
+
+	idTooLong := []byte("a1b2c3-ezrwzureouzqwr-23756gfidgkhvcbk;;select * from bla;")
+	id, query = getIDAndQuery(idTooLong)
+	assert.Equal(t, "", id, "should be the same")
+	assert.Equal(t, "a1b2c3-ezrwzureouzqwr-23756gfidgkhvcbk;;select * from bla;", string(query), "should be the same")
+
+	data = []byte(";;select * from bla;")
+	id, query = getIDAndQuery(data)
+	assert.Equal(t, "", id, "should be the same")
+	assert.Equal(t, "select * from bla;", string(query), "should be the same")
+
+}
+
 func TestExctractIdentifier(t *testing.T) {
 	data := []byte("a1b2c3;;select * from bla;")
 	id, queryOffset := exctractIdentifier(data)
@@ -130,11 +148,11 @@ func TestNetHandlerQuery(t *testing.T) {
 	pool.addToPool(c)
 
 	// load the query into the connection
-	c.Write([]byte("select * from apples"))
+	c.Write([]byte("a1f4-5ghghg;;select * from apples"))
 
 	fs := &fileStore{lock: &sync.Mutex{}}
 	fs.store = make(map[string]*q3file)
-	fs.store["5.6.7.8.db"] = &q3file{
+	fs.store["a1f4-5ghghg.db"] = &q3file{
 		path: "/fakefile",
 		db:   fakeDB,
 		lock: &sync.RWMutex{},

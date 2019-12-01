@@ -86,11 +86,14 @@ func (c *Config) updateConfig() {
 	}
 }
 
-func (f *fileStore) getFile(fileName string) (*q3file, error) {
+func (f *fileStore) getFile(identifier string) (*q3file, error) {
+
 	// verify that this path is valid
-	if !pathIsValid(fileName) {
-		return nil, errors.New("invalid filename supplied: '" + fileName + "'")
+	if !pathIsValid(identifier) {
+		return nil, errors.New("invalid filename supplied: '" + identifier + "'")
 	}
+	// filename is made up of supplied identifier, and ".db"
+	fileName := identifier + ".db"
 	// if file not already in store, create it, then return it
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -241,22 +244,27 @@ func (f *fileStore) netHandler(connection *QConn) {
 		writeError(connection.Conn, errors.New("empty string"))
 		return
 	}
-	q3f, err := f.getFile(connection.GetDBName())
+
+	id, query := getIDAndQuery(buf.Bytes())
+	if id == "" {
+		id = connection.GetDBName()
+	}
+	q3f, err := f.getFile(id)
 	if err != nil {
 		writeError(connection.Conn, err)
 		return
 	}
 	// route depending on Query or Exec
-	s := strings.Split(strings.ToLower(string(buf.Bytes())), " ")
+	s := strings.Split(strings.ToLower(string(query)), " ")
 	if s[0] == "select" {
-		rows, err := q3f.query(string(buf.Bytes()))
+		rows, err := q3f.query(string(query))
 		if err != nil {
 			writeError(connection.Conn, err)
 		} else {
 			q3f.rowsPrinter(connection.Conn, rows)
 		}
 	} else {
-		_, err := q3f.exec(string(buf.Bytes()))
+		_, err := q3f.exec(string(query))
 		if err != nil {
 			writeError(connection.Conn, err)
 		} else {
@@ -281,12 +289,16 @@ func (f *fileStore) httpReadHandler(w http.ResponseWriter, r *http.Request) {
 		writeError(w, errors.New("empty string"))
 		return
 	}
-	q3f, err := f.getFile(getHTTPDBName(r))
+	id, query := getIDAndQuery(b)
+	if id == "" {
+		id = getHTTPDBName(r)
+	}
+	q3f, err := f.getFile(id)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	rows, err := q3f.query(string(b))
+	rows, err := q3f.query(string(query))
 	if err != nil {
 		writeError(w, err)
 	} else {
@@ -311,12 +323,16 @@ func (f *fileStore) httpWriteHandler(w http.ResponseWriter, r *http.Request) {
 		writeError(w, errors.New("empty string"))
 		return
 	}
-	q3f, err := f.getFile(getHTTPDBName(r))
+	id, query := getIDAndQuery(b)
+	if id == "" {
+		id = getHTTPDBName(r)
+	}
+	q3f, err := f.getFile(id)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	_, err = q3f.exec(string(b))
+	_, err = q3f.exec(string(query))
 	if err != nil {
 		writeError(w, err)
 	} else {
@@ -328,7 +344,7 @@ func getHTTPDBName(r *http.Request) string {
 	address := r.RemoteAddr
 	if address != "" {
 		bits := strings.Split(address, ":")
-		return bits[0] + ".db"
+		return bits[0]
 	}
 	return ""
 }
@@ -372,6 +388,12 @@ func signalContext() context.Context {
 
 	return ctx
 
+}
+
+func getIDAndQuery(data []byte) (string, []byte) {
+	identifier, queryOffset := exctractIdentifier(data)
+	query := data[queryOffset:]
+	return identifier, query
 }
 
 func exctractIdentifier(data []byte) (string, int) {
