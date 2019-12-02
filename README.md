@@ -93,6 +93,6 @@ insert into bubble(id, word) values (111,"apples");
 which will, when sent to SQL3net, create a db file named "a1b2-c3d4-something-funky.db". prepend the same identifer at query time to retreive your data:
 ```
 $ cat query.txt
-a1b2c3d4;;select * from bubble;
+a1b2-c3d4-something-funky;;select * from bubble;
 ```
 
