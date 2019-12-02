@@ -113,7 +113,12 @@ func TestPathValid(t *testing.T) {
 	assert.True(t, pathIsValid("0.0.0.0"))
 	assert.True(t, pathIsValid("::1"))
 	assert.True(t, pathIsValid(":"))
-
+	assert.False(t, pathIsValid("\\"))
+	assert.False(t, pathIsValid("'"))
+	assert.False(t, pathIsValid("`"))
+	assert.False(t, pathIsValid("'"))
+	assert.False(t, pathIsValid(";"))
+	assert.False(t, pathIsValid("*"))
 }
 
 func TestQ3FileInit(t *testing.T) {
