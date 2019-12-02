@@ -145,13 +145,25 @@ func TestQ3FileInit(t *testing.T) {
 
 func TestRowsHTTPPrinter(t *testing.T) {
 
+	// verify for HTTP first...
 	fakeRows := sqlmock.NewRows([]string{"id", "name"}).AddRow("1", "hello")
 	rows := getSqlRows(fakeRows)
+
 	w := &fakeHttpWriter{b: &bytes.Buffer{}}
-	// confirm that rowsHTTPPrinter reads the rows from the DB, and writes back to the http.Writer
+	// confirm that rowsPrinter reads the rows from the DB, and writes back to the http.Writer
 	f := &q3file{}
-	f.rowsHTTPPrinter(w, rows)
+	f.rowsPrinter(w, rows)
 	assert.Equal(t, "1|hello\n", string(w.b.Bytes()), "should be the same as the sql rows")
+
+	// repeat, but for net.Conn...
+	fakeRows = sqlmock.NewRows([]string{"id", "name"}).AddRow("1", "hello")
+	rows = getSqlRows(fakeRows)
+	c := &FakeCon{}
+	// confirm that rowsPrinter reads the rows from the DB, and writes back to the http.Writer
+	f = &q3file{}
+	f.rowsPrinter(c, rows)
+
+	assert.Equal(t, "1|hello\n", string(c.Data), "should be the same as the sql rows")
 }
 
 func TestGetIPWithoutPort(t *testing.T) {

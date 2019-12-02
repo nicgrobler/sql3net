@@ -190,40 +190,7 @@ func writeError(conn io.Writer, err error) {
 	conn.Write([]byte(LINE_END))
 }
 
-func (f *q3file) rowsPrinter(conn net.Conn, rows *sql.Rows) {
-	// column names
-	columns, err := rows.Columns()
-	if err != nil {
-		writeError(conn, err)
-	}
-
-	values := make([]sql.RawBytes, len(columns))
-	scanArgs := make([]interface{}, len(values))
-	for i := range values {
-		scanArgs[i] = &values[i]
-	}
-
-	for rows.Next() {
-		err = rows.Scan(scanArgs...)
-		if err != nil {
-			writeError(conn, err)
-		}
-		// now print the row, column-wise
-		for i := range values {
-			conn.Write(values[i])
-			if i < len(values)-1 {
-				conn.Write([]byte(DELIM))
-			}
-		}
-		conn.Write([]byte(LINE_END))
-	}
-	if err = rows.Err(); err != nil {
-		writeError(conn, err)
-	}
-
-}
-
-func (f *q3file) rowsHTTPPrinter(w http.ResponseWriter, rows *sql.Rows) {
+func (f *q3file) rowsPrinter(w io.Writer, rows *sql.Rows) {
 	// column names
 	columns, err := rows.Columns()
 	if err != nil {
@@ -332,7 +299,7 @@ func (f *fileStore) httpReadHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, err)
 	} else {
-		q3f.rowsHTTPPrinter(w, rows)
+		q3f.rowsPrinter(w, rows)
 	}
 
 }
