@@ -88,5 +88,11 @@ insert into bubble(id, word) values (1,"banana");
 insert into bubble(id, word) values (1,"banana");
 insert into bubble(id, word) values (10,"oranges");
 insert into bubble(id, word) values (111,"apples");
+```
 
-will, when sent to SQL3net, create a db file named "a1b2-c3d4-something-funky.db". prepend the same identifer at query time to retreive your data.
+which will, when sent to SQL3net, create a db file named "a1b2-c3d4-something-funky.db". prepend the same identifer at query time to retreive your data:
+```
+$ cat query.txt
+a1b2-c3d4-something-funky;;select * from bubble;
+```
+
