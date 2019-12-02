@@ -74,3 +74,8 @@ func (s *HttpServer) StartListener(ctx context.Context, timeout time.Duration) {
 	// let parent know that we are done
 	close(s.Done)
 }
+
+func getHTTPDBName(r *http.Request) string {
+	address := r.RemoteAddr
+	return getIPWithoutPort(address)
+}

@@ -240,7 +240,7 @@ func (s *NetServer) StartListener(ctx context.Context, timeout time.Duration) {
 // GetDBName returns a string representation of the remote address of this connection
 func (c *QConn) GetDBName() string {
 	if addr, ok := c.Conn.RemoteAddr().(*net.TCPAddr); ok {
-		return addr.IP.String()
+		return getIPWithoutPort(addr.IP.String())
 	}
-	return c.Conn.RemoteAddr().String()
+	return getIPWithoutPort(c.Conn.RemoteAddr().String())
 }

@@ -111,7 +111,9 @@ func TestPathValid(t *testing.T) {
 	assert.False(t, pathIsValid("  "))
 	assert.False(t, pathIsValid("_ d_"))
 	assert.True(t, pathIsValid("0.0.0.0"))
-	assert.False(t, pathIsValid(":"))
+	assert.True(t, pathIsValid("::1"))
+	assert.True(t, pathIsValid(":"))
+
 }
 
 func TestQ3FileInit(t *testing.T) {
@@ -133,6 +135,16 @@ func TestQ3FileInit(t *testing.T) {
 	assert.Nil(t, f, "should be nil")
 	assert.Equal(t, "invalid filename supplied: ''", err.Error())
 
+}
+
+func TestGetIPWithoutPort(t *testing.T) {
+	assert.Equal(t, "1.2.3.4", getIPWithoutPort("1.2.3.4"), "should be the same")
+	assert.Equal(t, "1.2.3.4", getIPWithoutPort("1.2.3.4:80"), "should be the same")
+	assert.Equal(t, "1.2.3", getIPWithoutPort("1.2.3:4"), "should be the same")
+	assert.Equal(t, "1::2:3", getIPWithoutPort("1::2:3:80"), "should be the same")
+	assert.Equal(t, "[::1]", getIPWithoutPort("[::1]:80"), "should be the same")
+	assert.Equal(t, "::12", getIPWithoutPort("::12"), "should be the same")
+	assert.Equal(t, "::12", getIPWithoutPort("::12:8080"), "should be the same")
 }
 
 func TestNetHandlerQuery(t *testing.T) {

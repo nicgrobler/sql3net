@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	neturl "net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -114,17 +113,49 @@ func (f *q3file) getPath() string {
 }
 
 func pathIsValid(path string) bool {
-	// validate the supplied path
+	/*
+		validate the supplied path - the following cause us to return FALSE as
+		they're a bad idea for filepaths on Unix:
+
+		forward slash (/)
+		backslash (\)
+		NULL (\0)
+		tick (`)
+		starts with a dash (-)
+		star (*)
+		pipes (|)
+		semicolon (;)
+		quotations (" or ')
+
+	*/
 	if strings.TrimSpace(path) == "" {
 		return false
 	}
-	if strings.Contains(path, " ") {
-		// not windows, no whitespace in filenames
+	if strings.Contains(path, "\\") {
 		return false
 	}
-	// we have a dsn that MIGHT be valid, so need to parse it - if it fails here, it is likely to be invalid
-	_, err := neturl.Parse(path)
-	if err != nil {
+	if strings.Contains(path, " ") {
+		return false
+	}
+	if strings.Contains(path, "`") {
+		return false
+	}
+	if strings.HasPrefix(path, "-") {
+		return false
+	}
+	if strings.Contains(path, "*") {
+		return false
+	}
+	if strings.Contains(path, "|") {
+		return false
+	}
+	if strings.Contains(path, ";") {
+		return false
+	}
+	if strings.Contains(path, "\"") {
+		return false
+	}
+	if strings.Contains(path, "'") {
 		return false
 	}
 	return true
@@ -340,11 +371,20 @@ func (f *fileStore) httpWriteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func getHTTPDBName(r *http.Request) string {
-	address := r.RemoteAddr
-	if address != "" {
-		bits := strings.Split(address, ":")
-		return bits[0]
+func getIPWithoutPort(addr string) string {
+	if addr != "" {
+		// find last instance of ':', and split here
+		index := strings.LastIndex(addr, ":")
+		if index > 0 {
+			// on the offchance that we have an address such as '::1'
+			// we need to check if preceding index is also ':'
+			if addr[index-1] != ':' {
+				address := addr[0:index]
+				return address
+			}
+		}
+		// no ':' found, so no port substring
+		return addr
 	}
 	return ""
 }
