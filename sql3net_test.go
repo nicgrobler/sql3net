@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"database/sql"
 	"errors"
 	"net/http"
 	"os"
@@ -140,6 +141,17 @@ func TestQ3FileInit(t *testing.T) {
 	assert.Nil(t, f, "should be nil")
 	assert.Equal(t, "invalid filename supplied: ''", err.Error())
 
+}
+
+func TestRowsHTTPPrinter(t *testing.T) {
+
+	fakeRows := sqlmock.NewRows([]string{"id", "name"}).AddRow("1", "hello")
+	rows := getSqlRows(fakeRows)
+	w := &fakeHttpWriter{b: &bytes.Buffer{}}
+	// confirm that rowsHTTPPrinter reads the rows from the DB, and writes back to the http.Writer
+	f := &q3file{}
+	f.rowsHTTPPrinter(w, rows)
+	assert.Equal(t, "1|hello\n", string(w.b.Bytes()), "should be the same as the sql rows")
 }
 
 func TestGetIPWithoutPort(t *testing.T) {
@@ -326,3 +338,10 @@ type fakeWriter struct{}
 func (f fakeWriter) Header() http.Header        { return http.Header{} }
 func (f fakeWriter) Write([]byte) (int, error)  { return 0, nil }
 func (f fakeWriter) WriteHeader(statusCode int) { return }
+
+func getSqlRows(rows *sqlmock.Rows) *sql.Rows {
+	db, mock, _ := sqlmock.New()
+	mock.ExpectQuery("select").WillReturnRows(rows)
+	rrows, _ := db.Query("select")
+	return rrows
+}

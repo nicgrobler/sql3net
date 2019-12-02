@@ -17,7 +17,6 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -492,7 +491,7 @@ func main() {
 
 	// set logging
 	level := c.LoggingLevel
-	var logLevel logrus.Level
+	var logLevel log.Level
 	if err := logLevel.UnmarshalText([]byte(level)); err != nil {
 		log.Fatal(err)
 	}
