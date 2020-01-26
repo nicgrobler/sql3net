@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sql3net-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: sql3net-operator
+  template:
+    metadata:
+      labels:
+        name: sql3net-operator
+    spec:
+      serviceAccountName: sql3net-operator
+      containers:
+        - name: sql3net-operator
+          # Replace this with the built image name
+          image: REPLACE_IMAGE
+          imagePullPolicy: Always
+          env:
+            - name: WATCH_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: "sql3net-operator"

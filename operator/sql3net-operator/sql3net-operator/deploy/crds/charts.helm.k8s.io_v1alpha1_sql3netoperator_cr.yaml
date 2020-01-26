@@ -1,0 +1,34 @@
+apiVersion: charts.helm.k8s.io/v1alpha1
+kind: Sql3NetOperator
+metadata:
+  name: example-sql3netoperator
+spec:
+  # Default values copied from <project_dir>/helm-charts/sql3net-operator/values.yaml
+  
+  affinity: {}
+  fullnameOverride: ""
+  image:
+    pullPolicy: IfNotPresent
+    repository: nicgrobler/sql3net
+  imagePullSecrets: []
+  ingress:
+    annotations: {}
+    enabled: false
+    hosts:
+    - host: sql3net.local
+      paths: []
+    tls: []
+  nameOverride: ""
+  nodeSelector: {}
+  podSecurityContext: {}
+  replicaCount: 1
+  resources: {}
+  securityContext: {}
+  service:
+    port: 9090
+    type: ClusterIP
+  serviceAccount:
+    create: true
+    name: null
+  tolerations: []
+  
